@@ -82,7 +82,12 @@ def get_points_single(featmap_size, stride, device):
     """
 
     """ your code starts here """
-    points = None
+    #points = None
+    points = []
+    for hi in range(featmap_size[0]):
+        for wi in range(featmap_size[1]):
+            points.append([stride // 2 + stride * hi, stride // 2 + stride * wi])
+    points = torch.FloatTensor(points, device=device)
     """ your code ends here """
     return points
 
