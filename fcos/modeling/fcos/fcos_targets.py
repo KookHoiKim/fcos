@@ -209,8 +209,11 @@ def fcos_target_single_image(
     num_gts = len(gt_instances)
 
     # get class labels and bboxes from `gt_instances`.
-    gt_labels = NotImplemented
-    gt_bboxes = NotImplemented
+    #gt_labels = NotImplemented
+    #gt_bboxes = NotImplemented
+    gt_labels = gt_instances[gt_classes]
+    gt_bboxes = gt_instances[gt_boxes]
+    
 
     if num_gts == 0:
         return (
@@ -219,26 +222,42 @@ def fcos_target_single_image(
         )
 
     # `areas`: should be `torch.Tensor` shape of (num_points, num_gts, 1)
-    areas = NotImplemented  # 1. `torch.Tensor` shape of (num_gts, 1)
-    areas = NotImplemented  # 2. hint: use :func:`torch.repeat`.
+    #areas = NotImplemented  # 1. `torch.Tensor` shape of (num_gts, 1)
+    #areas = NotImplemented  # 2. hint: use :func:`torch.repeat`.
+    
+    #areas = points.new_zeros((num_gts, 1))
+    #areas = areas.repeat(num_points, 1)
+    areas = gt_labels.repeat(1, num_gts)
 
     # `regress_ranges`: should be `torch.Tensor` shape of (num_points, num_gts, 2)
-    regress_ranges = NotImplemented  # hint: use :func:`torch.expand`.
+    #regress_ranges = NotImplemented  # hint: use :func:`torch.expand`.
+    
+    regress_ranges = regress_ranges.expand(num_points, num_gts, 2)
 
     # `gt_bboxes`: should be `torch.Tensor` shape of (num_points, num_gts, 4)
-    gt_bboxes = NotImplemented  # hint: use :func:`torch.expand`.
+    #gt_bboxes = NotImplemented  # hint: use :func:`torch.expand`.
+    gt_bboxes = gt_bboxes.expand(-1, num_gts, 4)
 
     # align each coordinate  component xs, ys in shape as (num_points, num_gts)
     xs, ys = points[:, 0], points[:, 1]
-    xs = NotImplemented  # hint: use :func:`torch.expand`.
-    ys = NotImplemented  # hint: use :func:`torch.expand`.
+    #xs = NotImplemented  # hint: use :func:`torch.expand`.
+    #ys = NotImplemented  # hint: use :func:`torch.expand`.
+
+    xs = xs.expand(-1, num_gts)
+    ys = ys.expand(-1, num_gts)
 
     # distances to each four side of gt bboxes.
     # The equations correspond to equation(1) from FCOS paper.
-    left = NotImplemented
-    right = NotImplemented
-    top = NotImplemented
-    bottom = NotImplemented
+    #left = NotImplemented
+    #right = NotImplemented
+    #top = NotImplemented
+    #bottom = NotImplemented
+    
+    left = xs - gt_bboxes[:, :, 0]
+    right = gt_bboxes[:, :, 2] - xs
+    top = gt_bboxes[:, :, 1] - ys
+    bottom = ys - gt_bboxes[:, :, 3]
+    
     bbox_targets = torch.stack((left, top, right, bottom), -1)
 
     if center_sample:
@@ -290,24 +309,35 @@ def fcos_target_single_image(
     else:
         # condition1: a point should be inside a gt bbox
         # hint: all distances (l, t, r, b) > 0. use :func:`torch.min`.
-        inside_gt_bbox_mask = NotImplemented
+        #inside_gt_bbox_mask = NotImplemented
+        inside_gt_bbox_mask = torch.min(bbox_targets, 1) > 0
 
     # condition2: limit the regression range for each location
-    max_regress_distance = NotImplemented   # hint: use :func:`torch.max`.
+    #max_regress_distance = NotImplemented   # hint: use :func:`torch.max`.
+    max_regress_distance = torch.max(regress_ranges, 1)
+
 
     # The mask whether `max_regress_distance` on every points is bounded
     #   between the side values regress_ranges.
     # See section 3.2 3rd paragraph on FCOS paper.
-    inside_regress_range = (NotImplemented)
+    #inside_regress_range = (NotImplemented)
+    inside_regress_range = max_regress_distance < torch.max(bbox_targets, 1)
 
     # filter areas that violate condition1 and condition2 above.
-    areas[NotImplemented] = INF   # use `inside_gt_bbox_mask`
-    areas[NotImplemented] = INF   # use `inside_regress_range`
+    #areas[NotImplemented] = INF   # use `inside_gt_bbox_mask`
+    #areas[NotImplemented] = INF   # use `inside_regress_range`
+
+    areas[inside_gt_bbox_mask] = INF
+    areas[inside_regress_range] = INF
 
     # If there are still more than one objects for a location,
     # we choose the one with minimal area across `num_gts` axis.
     # Hint: use :func:`torch.min`.
-    min_area, min_area_inds = NotImplemented
+
+    #min_area, min_area_inds = NotImplemented
+
+    min_area = torch.min(areas, 1)
+    min_area_inds = torch.argmin(areas, 1)
 
     # ground-truth assignments w.r.t. bbox area indices
     labels = gt_labels[min_area_inds]
@@ -330,6 +360,12 @@ def compute_centerness_targets(pos_bbox_targets):
 
     """ your code starts here """
     centerness_targets = pos_bbox_targets.new_zeros(pos_bbox_targets.size(0), 1)
+    l = pos_bbox_targets[:, 0]
+    t = pos_bbox_targets[:, 1]
+    r = pos_bbox_targets[:, 2]
+    b = pos_bbox_targets[:, 3]
+
+    centerness_targets = torch.sqrt(torch.min(l, r)/torch.max(l, r) * torch.min(t, b)/torch.max(t, b))
     """ your code ends here """
 
     return centerness_targets
