@@ -310,18 +310,18 @@ def fcos_target_single_image(
         # condition1: a point should be inside a gt bbox
         # hint: all distances (l, t, r, b) > 0. use :func:`torch.min`.
         #inside_gt_bbox_mask = NotImplemented
-        inside_gt_bbox_mask = torch.min(bbox_targets, 1) > 0
+        inside_gt_bbox_mask = torch.min(bbox_targets, 1)[0] < 0
 
     # condition2: limit the regression range for each location
     #max_regress_distance = NotImplemented   # hint: use :func:`torch.max`.
-    max_regress_distance = torch.max(regress_ranges, 1)
+    max_regress_distance, _ = torch.max(regress_ranges, 1)
 
 
     # The mask whether `max_regress_distance` on every points is bounded
     #   between the side values regress_ranges.
     # See section 3.2 3rd paragraph on FCOS paper.
     #inside_regress_range = (NotImplemented)
-    inside_regress_range = max_regress_distance < torch.max(bbox_targets, 1)
+    inside_regress_range = max_regress_distance > torch.max(bbox_targets, 1)[0]
 
     # filter areas that violate condition1 and condition2 above.
     #areas[NotImplemented] = INF   # use `inside_gt_bbox_mask`
@@ -336,8 +336,8 @@ def fcos_target_single_image(
 
     #min_area, min_area_inds = NotImplemented
 
-    min_area = torch.min(areas, 1)
-    min_area_inds = torch.argmin(areas, 1)
+    min_area, min_area_inds = torch.min(areas, 1)
+    #min_area_inds = torch.argmin(areas, 1)
 
     # ground-truth assignments w.r.t. bbox area indices
     labels = gt_labels[min_area_inds]
